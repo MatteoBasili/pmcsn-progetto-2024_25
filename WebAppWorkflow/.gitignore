@@ -1,0 +1,63 @@
+# -------------------------
+# PyCharm / IntelliJ
+# -------------------------
+.idea/
+*.iml
+
+# Workspace di PyCharm
+.idea/workspace.xml
+.idea/tasks.xml
+.idea/dictionaries
+.idea/shelf/
+
+# Plugin e configurazioni locali
+.idea/httpRequests/
+.idea/caches/
+.idea/assetWizardSettings.xml
+.idea/modules.xml
+
+# -------------------------
+# Python
+# -------------------------
+
+# Byte-compiled / cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# File di build
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Virtual environments
+venv/
+ENV/
+env/
+.venv/
+
+# Test coverage
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+pytest_cache/
+
+# Jupyter
+.ipynb_checkpoints
+
+# Log
+*.log
+
+# -------------------------
+# Sistema Operativo
+# -------------------------
+
+# macOS
+.DS_Store
+
+# Windows
+Thumbs.db
