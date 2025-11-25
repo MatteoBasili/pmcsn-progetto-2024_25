@@ -1,5 +1,5 @@
 # ----------------- Configuration File -----------------
-SIM_TIME = 3600.0 * 20   # total simulation time (seconds)
+SIM_TIME = 3600.0 * 1   # total simulation time (seconds)
 ARRIVAL_RATE = 1.2      # requests per second
 SEED = 12345
 ARRIVAL_STREAM = 0    # stream dedicated to arrivals
@@ -12,14 +12,17 @@ SERVICE_STREAMS = {
 }
 
 # Numero di ripetizioni
-NUM_REPETITIONS = 16 #128
+NUM_REPETITIONS = 3 #128
 
 # Time-slot (for finite-horizon simulation)
 TS_STEP = 300   # 5 minutes
 
+# Batch parameters (for infinite-horizon simulation)
+BATCH_K = 128
+BATCH_B = 4320
 
 # Mean service times for each node/class
-service_demands = {
+SERVICE_DEMANDS = {
     'A': {
         'Class1': 0.2,
         'Class2': 0.4,
@@ -41,8 +44,8 @@ USE_POW_B = False
 
 # Apply modifications
 if USE_2FA:
-    service_demands['A']['Class3'] = 0.15
-    service_demands['P']['Class2'] = 0.7
+    SERVICE_DEMANDS['A']['Class3'] = 0.15
+    SERVICE_DEMANDS['P']['Class2'] = 0.7
 
 if USE_POW_B:
-    service_demands['B']['Class1'] = 0.4
+    SERVICE_DEMANDS['B']['Class1'] = 0.4

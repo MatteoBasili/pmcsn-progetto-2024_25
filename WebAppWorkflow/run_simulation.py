@@ -1,16 +1,14 @@
 import sys
+import time
 
-from sim_config import SIM_TIME, NUM_REPETITIONS
-from src.simulator import finite_horizon_simulation
-from src.utils import print_line
-
-
-# Qui poi importeremo le funzioni del simulatore
-# from simulator import run_finite_horizon, run_infinite_horizon
+from sim_config import SIM_TIME, NUM_REPETITIONS, BATCH_K, BATCH_B
+from src.simulator import finite_horizon_simulation, infinite_horizon_simulation
+from src.sim_utils import print_line
 
 
 def run_finite_horizon():
     print("\n[INFO] Avviata simulazione a orizzonte FINITO...\n")
+    time.sleep(1)
     print(f"\n\n==== Finite-Horizon Simulation ===="
           f"\n* Simulation time: {SIM_TIME}"
           f"\n* Repetitions:     {NUM_REPETITIONS}")
@@ -18,16 +16,20 @@ def run_finite_horizon():
     finite_horizon_simulation(SIM_TIME)
     print()
     print_line()
-    print("[INFO] Simulazione finita.")
+    time.sleep(1)
+    print("[INFO] Simulazione finita.\n")
 
 def run_infinite_horizon():
-    """
-    Funzione stub per la simulazione a orizzonte infinito.
-    In seguito andrà sostituita con la logica della simulazione reale.
-    """
     print("\n[INFO] Avviata simulazione a orizzonte INFINITO...\n")
-    # TODO: collegare il simulatore reale
-    print("[DEBUG] Simulazione finita (stub).")
+    time.sleep(1)
+    print(f"\n\n==== Infinite-Horizon Simulation ===="
+          f"\n#batch: {BATCH_K}")
+    print_line()
+    infinite_horizon_simulation(BATCH_K, BATCH_B)
+    print()
+    print_line()
+    time.sleep(1)
+    print("[INFO] Simulazione finita.\n")
 
 
 def main_menu():
