@@ -1,26 +1,140 @@
+import csv
 import heapq
 import time
 
 from tqdm import tqdm
 
 from sim_config import *
-from src.sim_entities import *
-from src.sim_utils import *
+from src.entities import *
+from src.utils import *
 
 
-def simulate_batch(b, arrival_rate, service_demands, service_streams,
+def schedule_departure(sname, now, servers, evq):
+    srv = servers[sname]
+    srv.version += 1
+    td = srv.next_departure_time(now)
+    if td is not None:
+        heapq.heappush(evq, Event(td, 'departure', (sname, srv.version)))
+
+def handle_arrival(t, evq, servers, service_demands, arrival_stream, service_streams,
+                   arrival_rate, in_flight):
+
+    job = Job(t)
+    in_flight[job.id] = job
+    mean = service_demands['A'][job.current_class]
+    st = exp_sample(mean, service_streams['A'])
+
+    #########################################
+    # Per il plot della sequenza delle visite
+    if PLOT_VISITS:
+        st = mean
+    #########################################
+
+    servers['A'].process_arrival(job, st)
+
+    # aggiorna visita e history
+    job.visit_count['A'] = job.visit_count.get('A', 0) + 1
+    visit_number = job.visit_count['A']
+    job.history.append(('A', job.current_class, visit_number, t, None))
+
+    schedule_departure('A', t, servers, evq)
+
+    # Schedule next arrival
+    t_next_arr = t + interarrival_time(arrival_rate, arrival_stream)
+
+    #########################################
+    # Per il plot della sequenza delle visite
+    if PLOT_VISITS:
+        t_next_arr = t + 3  # un arrivo ogni tre secondi
+    #########################################
+
+    heapq.heappush(evq, Event(t_next_arr, 'arrival', None))
+
+def handle_departure(ev, t, evq, servers, service_demands,
+                     service_streams, in_flight, completed_jobs):
+    sname, ev_version = ev.payload
+    srv = servers[sname]
+
+    job = srv.process_completion(ev_version)
+    if job is None:
+        # stale event
+        return
+
+    # Aggiorna la history del job
+    for i in range(len(job.history) - 1, -1, -1):
+        if job.history[i][0] == sname and job.history[i][4] is None:
+            job.history[i] = (
+                job.history[i][0],
+                job.history[i][1],
+                job.history[i][2],
+                job.history[i][3],
+                t
+            )
+            job.server_times[sname] = job.server_times.get(sname, 0.0) + (t - job.history[i][3])
+            break
+
+    schedule_departure(sname, t, servers, evq)
+
+    # Routing
+    nextn = next_node_after(sname, job)
+    if nextn == 'CS':
+        new_class = do_class_switch(job)
+        mean = service_demands['A'][new_class]
+        st = exp_sample(mean, service_streams['A'])
+
+        #########################################
+        # Per il plot della sequenza delle visite
+        if PLOT_VISITS:
+            st = mean
+        #########################################
+
+        servers['A'].process_arrival(job, st)
+
+        # aggiorna visita e history
+        job.visit_count['A'] = job.visit_count.get('A', 0) + 1
+        visit_number = job.visit_count['A']
+        job.history.append(('A', job.current_class, visit_number, t, None))
+
+        schedule_departure('A', t, servers, evq)
+
+    elif nextn in ['B', 'P']:
+        mean = service_demands[nextn][job.current_class]
+        st = exp_sample(mean, service_streams[nextn])
+
+        #########################################
+        # Per il plot della sequenza delle visite
+        if PLOT_VISITS:
+            st = mean
+        #########################################
+
+        servers[nextn].process_arrival(job, st)
+
+        job.visit_count[nextn] = job.visit_count.get(nextn, 0) + 1
+        visit_number = job.visit_count[nextn]
+        job.history.append((nextn, job.current_class, visit_number, t, None))
+
+        schedule_departure(nextn, t, servers, evq)
+
+    elif nextn == 'SINK':
+        job.finish = t
+        completed_jobs.append(job)
+        in_flight.pop(job.id, None)
+
+def process_event(ev, t, evq, servers, service_demands, arrival_stream, service_streams,
+                  arrival_rate, in_flight, completed_jobs):
+
+    # Process event
+    if ev.etype == 'arrival':
+        handle_arrival(t, evq, servers, service_demands, arrival_stream, service_streams,
+                       arrival_rate, in_flight)
+
+    elif ev.etype == 'departure':
+        handle_departure(ev, t, evq, servers, service_demands,
+                         service_streams, in_flight, completed_jobs)
+
+def simulate_batch(max_completed_jobs, arrival_rate, service_demands, arrival_stream, service_streams,
                    initial_servers=None, initial_evq=None,
-                   initial_t=0.0, initial_in_flight=None,
-                   initial_arrival_queue=None):
-    """
-    Simulate until `b` arrivals **and** `b` completions are processed.
-    This function only updates the system state, without computing statistics.
-
-    Returns:
-        completed_jobs: list of Job objects completed in this batch
-        servers, in_flight, evq, t: updated system state after the call
-        arrival_queue: remaining arrivals not yet processed
-    """
+                   initial_t=0.0, initial_in_flight=None):
     t = float(initial_t)
 
     # Initialize servers
@@ -32,218 +146,84 @@ def simulate_batch(b, arrival_rate, service_demands, service_streams,
     # Event queues
     evq = [] if initial_evq is None else initial_evq  # heapq for departures
     in_flight = {} if initial_in_flight is None else initial_in_flight
-    arrival_queue = [] if initial_arrival_queue is None else initial_arrival_queue  # list for arrivals
 
     completed_jobs = []
-    processed_arrivals = 0
-
-    def schedule_departure(sname, now):
-        srv = servers[sname]
-        srv.version += 1
-        td = srv.next_departure_time(now)
-        if td is not None:
-            heapq.heappush(evq, Event(td, 'departure', (sname, srv.version)))
 
     # Ensure at least one arrival is scheduled
-    if not arrival_queue:
-        t_next_arr = t + interarrival_time(arrival_rate)
-        arrival_queue.append(Event(t_next_arr, 'arrival', None))
+    if not evq:
+        t_next_arr = t + interarrival_time(arrival_rate, arrival_stream)
+        heapq.heappush(evq, Event(t_next_arr, 'arrival', None))
 
     # Main loop
-    while (processed_arrivals < b or len(completed_jobs) < b) and (arrival_queue or evq):
-        # Decide next event to process
-        next_arrival_time = arrival_queue[0].time if arrival_queue else float('inf')
-        next_departure_time = evq[0].time if evq else float('inf')
-
-        if processed_arrivals >= b:
-            # We cannot process more arrivals in this batch
-            next_event_type = 'departure'
-        else:
-            # Take the earliest
-            if next_arrival_time <= next_departure_time:
-                next_event_type = 'arrival'
-            else:
-                next_event_type = 'departure'
-
-        # Process event
-        if next_event_type == 'arrival':
-            ev = arrival_queue.pop(0)
-            t = ev.time
-            processed_arrivals += 1
-
-            job = Job(t)
-            in_flight[job.id] = job
-            meanA = service_demands['A'][job.current_class]
-            st = exp_sample(meanA, service_streams['A'])
-            servers['A'].process_arrival(job, st, t)
-            job.history.append(('A', t, None))
-            schedule_departure('A', t)
-
-            # Schedule next arrival
-            t_next_arr = t + interarrival_time(arrival_rate)
-            arrival_queue.append(Event(t_next_arr, 'arrival', None))
-
-        else:  # departure
-            ev = heapq.heappop(evq)
-            t = ev.time
-            sname, ev_version = ev.payload
-            srv = servers[sname]
-
-            job = srv.process_completion(t, ev_version)
-            if job is None:
-                continue  # stale event
-
-            # Update job history
-            for i in range(len(job.history) - 1, -1, -1):
-                if job.history[i][0] == sname and job.history[i][2] is None:
-                    job.history[i] = (job.history[i][0], job.history[i][1], t)
-                    break
-
-            schedule_departure(sname, t)
-
-            # Routing
-            nextn = next_node_after(sname, job)
-            if nextn == 'CS':
-                new_class = do_class_switch(job)
-                mean = service_demands['A'][new_class]
-                st = exp_sample(mean, service_streams['A'])
-                servers['A'].process_arrival(job, st, t)
-                job.history.append(('A', t, None))
-                schedule_departure('A', t)
-
-            elif nextn in ['B', 'P']:
-                mean = service_demands[nextn][job.current_class]
-                st = exp_sample(mean, service_streams[nextn])
-                servers[nextn].process_arrival(job, st, t)
-                job.history.append((nextn, t, None))
-                schedule_departure(nextn, t)
-
-            elif nextn == 'SINK':
-                job.finish = t
-                completed_jobs.append(job)
-                in_flight.pop(job.id, None)
-
-    # Update server stats
-    for srv in servers.values():
-        srv.update_progress(t)
-
-    return completed_jobs, servers, in_flight, evq, t, arrival_queue
-
-# -------------------------------------------------------
-#                     Simulation Engine
-# -------------------------------------------------------
-def simulate(sim_time, arrival_rate, service_demands, service_streams):
-    Job._id = 0
-    t = 0.0
-    evq = []
-
-    servers = {name: PSServer(name) for name in ['A','B','P']}
-    arrived_jobs = 0
-    completed_jobs = []
-    in_flight = {}
-
-    def schedule_departure(sname, now):
-        srv = servers[sname]
-        srv.version += 1
-        td = srv.next_departure_time(now)
-        if td is not None:
-            heapq.heappush(evq, Event(td, 'departure', (sname, srv.version)))
-
-    # first arrival
-    t_next_arr = t + interarrival_time(arrival_rate)
-    heapq.heappush(evq, Event(t_next_arr, 'arrival', None))
-
-    while evq:
+    while evq and len(completed_jobs) < max_completed_jobs:
         ev = heapq.heappop(evq)
-        '''
-        print("\n--- DEBUG: Server states ---")
-        for sname, srv in servers.items():
-            print(f"Server {sname}: {len(srv.jobs)} jobs")
-            for j in srv.jobs:
-                print(f"   Job {j.id}: remaining={j.remaining:.6f}, birth={j.birth:.4f}, class={j.current_class}")
-        print("-------------------------------------------")
-
-        print("\n--- DEBUG: Event popped ---")
-        print("Current time:", t)
-        print("Processing event:", ev)
-        print("Remaining events in queue:")
-        for e in evq:
-            print("   ", e)
-        '''
         t = ev.time
-        if t > sim_time:
-            break
 
-        if ev.etype == 'arrival':
-            arrived_jobs += 1
-            job = Job(t)
-            in_flight[job.id] = job
-            meanA = service_demands['A'][job.current_class]
-            st = exp_sample(meanA, service_streams['A'])
-            servers['A'].process_arrival(job, st, t)
-            job.history.append(('A', t, None))
-            schedule_departure('A', t)
+        # Update server stats
+        for srv in servers.values():
+            srv.update_progress(t)
 
-            # schedule next arrival
-            t_next_arr = t + interarrival_time(arrival_rate)
-            heapq.heappush(evq, Event(t_next_arr, 'arrival', None))
+        process_event(
+            ev, t, evq, servers, service_demands, arrival_stream, service_streams,
+            arrival_rate, in_flight, completed_jobs
+        )
 
-        elif ev.etype == 'departure':
-            sname, ev_version = ev.payload
-            srv = servers[sname]
+    return completed_jobs, servers, in_flight, evq, t
 
-            job = srv.process_completion(t, ev_version)
-            if job is None:
-                continue
+def find_batch_b(b_values=(64,128,256,512,1024,2048, 4096, 8192),
+                 k=128,
+                 output_folder="results/infinite/"):
+    print("\n=== Ricerca batch size b ottimale ===")
+    print(f"Batch k = {k}")
+    print("Valori testati di b:", b_values)
 
-            # Aggiorna la history del job
-            for i in range(len(job.history) - 1, -1, -1):
-                if job.history[i][0] == sname and job.history[i][2] is None:
-                    job.history[i] = (job.history[i][0], job.history[i][1], t)
-                    break
+    rngs.plantSeeds(SEED)
 
-            schedule_departure(sname, t)
+    for b in b_values:
+        print(f"\n>>> Test batch size b = {b}")
 
-            nextn = next_node_after(sname, job)
-            if nextn == 'CS':
-                new_class = do_class_switch(job)
-                mean = service_demands['A'][new_class]
-                st = exp_sample(mean, service_streams['A'])
-                servers['A'].process_arrival(job, st, t)
-                job.history.append(('A', t, None))
-                schedule_departure('A', t)
+        servers = {name: PSServer(name) for name in ['A', 'B', 'P']}
+        evq = []
+        in_flight = {}
+        t = 0.0
 
-            elif nextn in ['B', 'P']:
-                mean = service_demands[nextn][job.current_class]
-                st = exp_sample(mean, service_streams[nextn])
-                servers[nextn].process_arrival(job, st, t)
-                job.history.append((nextn, t, None))
-                schedule_departure(nextn, t)
+        batch_rts = []
 
-            elif nextn == 'SINK':
-                job.finish = t
-                completed_jobs.append(job)
-                in_flight.pop(job.id, None)
+        for _ in tqdm(range(k), desc=f"b={b}", ascii="░▒▓█", ncols=90):
+            completed_batch, servers, in_flight, evq, t = simulate_batch(
+                max_completed_jobs=b,
+                arrival_rate=ARRIVAL_RATE,
+                service_demands=SERVICE_DEMANDS,
+                arrival_stream=ARRIVAL_STREAM,
+                service_streams=SERVICE_STREAMS,
+                initial_servers=servers,
+                initial_evq=evq,
+                initial_t=t,
+                initial_in_flight=in_flight
+            )
 
-    for srv in servers.values():
-        srv.update_progress(sim_time)
+            # calcolo mean response time del batch
+            if completed_batch:
+                mean_rt = sum(job.finish - job.birth for job in completed_batch) / len(completed_batch)
+            else:
+                mean_rt = 0.0
 
-    n_completed = len(completed_jobs)
-    avg_rt = sum(job.finish - job.birth for job in completed_jobs) / n_completed if n_completed else 0.0
-    stats = {
-        'completed_jobs': n_completed,
-        'avg_response_time_s': avg_rt,
-        'throughput_rps': n_completed / (sim_time if sim_time > 0 else 1.0)
-    }
-    for sname, srv in servers.items():
-        util = srv.cumulative_busy_time / (sim_time if sim_time > 0 else 1.0)
-        avg_n = srv.area_num_in_system / (sim_time if sim_time > 0 else 1.0)
-        stats[f'{sname}_utilization'] = util
-        stats[f'{sname}_avg_n'] = avg_n
-        stats[f'{sname}_arrivals'] = srv.num_arrivals
-        stats[f'{sname}_departures'] = srv.num_departures
+            batch_rts.append(mean_rt)
 
-    return stats, completed_jobs
+            # resetta solo le statistiche dei server
+            for srv in servers.values():
+                srv.reset_statistics()
+
+        os.makedirs(output_folder, exist_ok=True)
+        csv_path = f"{output_folder}rt_batch_inf_{b}.csv"
+        with open(csv_path, "w", newline="") as f:
+            w = csv.writer(f)
+            for rt in batch_rts:
+                w.writerow([rt])
+
+        print(f"✔ Salvato CSV: {csv_path}")
+
+    print("\n=== Completato. Ora puoi lanciare acs.c sui CSV generati. ===\n")
 
 def infinite_horizon_simulation(k, b):
     rngs.plantSeeds(SEED)
@@ -252,23 +232,22 @@ def infinite_horizon_simulation(k, b):
     servers = {name: PSServer(name) for name in ['A', 'B', 'P']}
     evq = []
     in_flight = {}
-    arrival_queue = []
     t = 0.0
     last_completion_time = 0.0
 
     batch_stats = []
 
     for bi in tqdm(range(k), desc="Simulation in progress...", ascii="░▒▓█", ncols=100):
-        completed_batch, servers, in_flight, evq, t, arrival_queue = simulate_batch(
-            b=b,
+        completed_batch, servers, in_flight, evq, t = simulate_batch(
+            max_completed_jobs=b,
             arrival_rate=ARRIVAL_RATE,
             service_demands=SERVICE_DEMANDS,
+            arrival_stream=ARRIVAL_STREAM,
             service_streams=SERVICE_STREAMS,
             initial_servers=servers,
             initial_evq=evq,
             initial_t=t,
-            initial_in_flight=in_flight,
-            initial_arrival_queue=arrival_queue
+            initial_in_flight=in_flight
         )
 
         # calcolo durata batch
@@ -301,6 +280,16 @@ def infinite_horizon_simulation(k, b):
         batch_stats.append(bs)
         time.sleep(0.05)
 
+    # --- Generazione file .dat per ogni statistica ---
+    stats_to_save = list(batch_stats[0].keys())
+    for stat in stats_to_save:
+        path = os.path.join("results/infinite/", f"{stat}.dat")
+        with open(path, "w") as f:
+            for b in batch_stats:
+                f.write(f"{b[stat]}\n")
+        print(f"✔ Salvato {path}")
+
+    '''
     # statistiche aggregate su tutti i batch
     aggregated = {}
     aggregated['mean_rt'] = sum(b['mean_rt'] for b in batch_stats) / k
@@ -311,7 +300,7 @@ def infinite_horizon_simulation(k, b):
         aggregated[f'{sname}_arrivals'] = sum(b[f'{sname}_arrivals'] for b in batch_stats) / k
         aggregated[f'{sname}_departures'] = sum(b[f'{sname}_departures'] for b in batch_stats) / k
 
-    final_state = (servers, evq, in_flight, arrival_queue, t)
+    final_state = (servers, evq, in_flight, t)
 
     # Stampo i risultati aggregati
     print("\n=== Aggregated Statistics Over All Batches ===")
@@ -319,79 +308,108 @@ def infinite_horizon_simulation(k, b):
         print(f"{key}: {value}")
 
     return batch_stats, aggregated, final_state
+    '''
 
-def finite_horizon_run(stop_time, repetition, response_times_ts, num_ts):
-    stats, completed_jobs = simulate(stop_time, ARRIVAL_RATE, SERVICE_DEMANDS, SERVICE_STREAMS)
+# Funzione helper per calcolare metriche
+def compute_metrics_finite(servers, completed_jobs, t, in_flight):
+    metrics = {}
+    # RT e throughput globali
+    if completed_jobs:
+        metrics['RT'] = sum(j.finish - j.birth for j in completed_jobs) / len(completed_jobs)
+        metrics['Throughput'] = len(completed_jobs) / t
+    else:
+        metrics['RT'] = 0.0
+        metrics['Throughput'] = 0.0
 
-    # Sort jobs by finish time
-    completed_sorted = sorted(completed_jobs, key=lambda j: j.finish)
+    # metriche server
+    for sname, srv in servers.items():
+        metrics[f'N_{sname}'] = len(srv.jobs)
+        metrics[f'U_{sname}'] = srv.cumulative_busy_time / t
+        metrics[f'Throughput_{sname}'] = srv.num_departures / t
 
-    idx = 0
-    n = len(completed_sorted)
+        # RT per server
+        server_rts = [j.server_times.get(sname, 0.0) for j in completed_jobs]
+        metrics[f'RT_{sname}'] = sum(server_rts)/len(server_rts) if server_rts else 0.0
 
-    for slot in range(num_ts):
-        t_slot = slot * TS_STEP
+    # numero di richieste in esecuzione nel sistema
+    metrics['N_system'] = len(in_flight)
 
-        # include all jobs completed before t_slot
-        while idx < n and completed_sorted[idx].finish <= t_slot:
-            idx += 1
+    return metrics
 
-        if idx == 0:
-            # no completed jobs yet
-            response_times_ts[repetition][slot] = 0.0
-        else:
-            # compute average response time up to this time
-            s = 0.0
-            for j in completed_sorted[:idx]:
-                s += (j.finish - j.birth)
-            response_times_ts[repetition][slot] = s / idx
+# -------------------------------------------------------
+#                     Simulation Engine
+# -------------------------------------------------------
+def simulate_finite(stop_time, arrival_rate, service_demands, arrival_stream, service_streams, ts_step):
+    Job._id = 0
+    t = 0.0
+    next_sample_time = 0.0
+
+    servers = {name: PSServer(name) for name in ['A','B','P']}
+    evq = []
+    completed_jobs = []
+    in_flight = {}
+
+    # Lista finale di campioni: ogni elemento è un dict con tutte le metriche
+    sampled_metrics = []
+
+    # first arrival
+    t_next_arr = t + interarrival_time(arrival_rate, arrival_stream)
+
+    #########################################
+    # Per il plot della sequenza delle visite
+    if PLOT_VISITS:
+        t_next_arr = t + 3   # un arrivo ogni tre secondi
+    #########################################
+
+    heapq.heappush(evq, Event(t_next_arr, 'arrival', None))
+
+    while evq:
+        ev = heapq.heappop(evq)
+        t = ev.time
+
+        if t > stop_time:
+            for srv in servers.values():
+                srv.update_progress(stop_time)
+
+            while next_sample_time <= stop_time:
+                metrics = compute_metrics_finite(servers, completed_jobs, stop_time, in_flight)
+                sampled_metrics.append(metrics)
+                next_sample_time += ts_step
+            break
+
+        for srv in servers.values():
+            srv.update_progress(t)
+
+        # --- SAMPLING ---
+        while next_sample_time <= t:
+            metrics = compute_metrics_finite(servers, completed_jobs, t, in_flight)
+            sampled_metrics.append(metrics)
+            next_sample_time += ts_step
+
+        process_event(
+            ev, t, evq, servers, service_demands, arrival_stream, service_streams,
+            arrival_rate, in_flight, completed_jobs
+        )
+
+    return sampled_metrics, completed_jobs
 
 # Esegue una simulazione a orizzonte finito per un certo numero di volte
-def finite_horizon_simulation(stop_time):
+def finite_horizon_simulation(stop_time, num_repetitions):
     rngs.plantSeeds(SEED)
-    num_ts = int(stop_time // TS_STEP) + 1
-    response_times_ts = [
-        [0.0] * num_ts for _ in range(NUM_REPETITIONS)
-    ]
+    all_replicas_metrics = []
 
-    #statistics = [[0.0] * NUM_BLOCKS for _ in range(NUM_REPETITIONS)]
-    #statistics_fin = [[[0.0 for _ in range(NUM_BLOCKS)] for _ in range(NUM_TIME_SLOTS)] for _ in range(NUM_REPETITIONS)]
-    #repetitions_costs = [0.0] * NUM_REPETITIONS
-    #continuous_delays = [[[0.0 for _ in range(NUM_BLOCKS)] for _ in range(FIVE_MINUTES_IN_DAY + 1)] for _ in range(NUM_REPETITIONS)]
+    for _ in tqdm(range(num_repetitions), desc="Simulation in progress...", ascii="░▒▓█", ncols=100):
+        metrics, completed_jobs = simulate_finite(stop_time, ARRIVAL_RATE, SERVICE_DEMANDS,
+                                                  ARRIVAL_STREAM, SERVICE_STREAMS, TS_STEP)
+        all_replicas_metrics.append(metrics)
 
-    #arrivi = [0] * NUM_REPETITIONS
+        #########################################
+        # Per il plot della sequenza delle visite
+        if PLOT_VISITS:
+            plot_job_visit_sequence(completed_jobs)
+        #########################################
 
-
-    for r in tqdm(range(NUM_REPETITIONS), desc="Simulation in progress...", ascii="░▒▓█", ncols=100):
-        finite_horizon_run(stop_time, r, response_times_ts, num_ts)
         time.sleep(0.05)
 
-    mean_curve = [0.0] * num_ts
-    for ts in range(num_ts):
-        for r in range(NUM_REPETITIONS):
-            mean_curve[ts] += response_times_ts[r][ts]
-        mean_curve[ts] /= NUM_REPETITIONS
-
-    save_response_times_matrix_csv(response_times_ts, TS_STEP)
-    save_mean_curve_csv(mean_curve, TS_STEP)
-
-    #write_mean_delays_finite(continuous_delays)
-    #write_delays_csv_finite(statistics_fin)
-    #write_delays_csv_finite(statistics)
-    #print_results_finite(repetitions_costs)
-
-if __name__ == '__main__':
-    print("Simulazione: ARRIVAL_RATE=%.3f req/s, SIM_TIME=%.0f s" % (ARRIVAL_RATE, SIM_TIME))
-    stats, jobs = simulate(SIM_TIME, ARRIVAL_RATE, SERVICE_DEMANDS, SERVICE_STREAMS)
-    for k, v in stats.items():
-        if isinstance(v, float):
-            print(f"{k}: {v:.6f}")
-        else:
-            print(f"{k}: {v}")
-        # show un esempio history di un job completato
-    if jobs:
-        print("\nEsempio di job completato (history):")
-        j0 = jobs[0]
-        print("Job id", j0.id, "birth", j0.birth, "finish", j0.finish)
-        for s, enter, leave in j0.history:
-            print(f"  {s}: enter {enter:.6f}, leave {leave:.6f}")
+    if not PLOT_VISITS:
+        save_finite_metrics(all_replicas_metrics, num_repetitions)
