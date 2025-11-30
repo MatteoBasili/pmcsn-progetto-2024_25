@@ -1,4 +1,5 @@
 import os
+import time
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -56,10 +57,12 @@ def do_class_switch(job):
 # Calcola metriche a orizzonte finito
 def compute_metrics_finite(servers, completed_jobs, t, in_flight):
     metrics = {}
+
     # RT e throughput globali
-    if completed_jobs:
-        metrics['RT'] = sum(j.finish - j.birth for j in completed_jobs) / len(completed_jobs)
-        metrics['Throughput'] = len(completed_jobs) / t
+    n_completed = len(completed_jobs)
+    if n_completed > 0 and t > 0:
+        metrics['RT'] = sum(j.finish - j.birth for j in completed_jobs) / n_completed
+        metrics['Throughput'] = n_completed / t
     else:
         metrics['RT'] = 0.0
         metrics['Throughput'] = 0.0
@@ -67,8 +70,8 @@ def compute_metrics_finite(servers, completed_jobs, t, in_flight):
     # metriche server
     for sname, srv in servers.items():
         metrics[f'N_{sname}'] = len(srv.jobs)
-        metrics[f'U_{sname}'] = srv.cumulative_busy_time / t
-        metrics[f'Throughput_{sname}'] = srv.num_departures / t
+        metrics[f'U_{sname}'] = (srv.cumulative_busy_time / t) if t > 0 else 0.0
+        metrics[f'Throughput_{sname}'] = (srv.num_departures / t) if t > 0 else 0.0
 
         # RT per server
         server_rts = [j.server_times.get(sname, 0.0) for j in completed_jobs]
@@ -76,6 +79,37 @@ def compute_metrics_finite(servers, completed_jobs, t, in_flight):
 
     # numero di richieste in esecuzione nel sistema
     metrics['N_system'] = len(in_flight)
+
+    return metrics
+
+def compute_metrics_infinite(servers, completed_batch, duration):
+    metrics = {}
+
+    # --- Global RT & Throughput ---
+    n_completed = len(completed_batch)
+    if n_completed > 0 and duration > 0:
+        metrics['RT'] = sum(j.finish - j.birth for j in completed_batch) / n_completed
+        metrics['Throughput'] = n_completed / duration
+    else:
+        metrics['RT'] = 0.0
+        metrics['Throughput'] = 0.0
+
+    # --- Server-level metrics ---
+    for sname, srv in servers.items():
+        metrics[f'N_{sname}'] = (srv.area_num_in_system / duration) if duration > 0 else 0.0
+        metrics[f'U_{sname}'] = (srv.cumulative_busy_time / duration) if duration > 0 else 0.0
+        metrics[f'Throughput_{sname}'] = (srv.num_departures / duration) if duration > 0 else 0.0
+
+        # Server response times
+        server_rts = [j.server_times.get(sname, 0.0) for j in completed_batch]
+        metrics[f'RT_{sname}'] = sum(server_rts) / len(server_rts) if server_rts else 0.0
+
+    # System-wide number of jobs in system
+    if duration > 0:
+        n_system_avg = sum(srv.area_num_in_system for srv in servers.values()) / duration
+    else:
+        n_system_avg = 0.0
+    metrics['N_system'] = n_system_avg
 
     return metrics
 
@@ -100,7 +134,23 @@ def save_finite_metrics(all_replicas_metrics, num_repetitions):
             for val in avg_values:
                 f.write(f"{val}\n")
 
-    print(f"\n✔ Average metrics saved in {RESULTS_FINITE_FOLDER}")
+    print(f"\n✔ Metrics saved in {RESULTS_FINITE_FOLDER}")
+
+# Salva le statistiche a orizzonte infinito in file .dat (uno per riga)
+def save_infinite_metrics(batch_stats):
+    os.makedirs(RESULTS_INFINITE_FOLDER, exist_ok=True)
+
+    # Ottieni la lista delle metriche (chiavi del primo batch)
+    metric_keys = list(batch_stats[0].keys())
+
+    for key in metric_keys:
+        path = os.path.join(RESULTS_INFINITE_FOLDER, f"{key}.dat")
+
+        with open(path, "w") as f:
+            for bs in batch_stats:
+                f.write(f"{bs[key]}\n")
+
+    print(f"\n✔ Metrics saved in {RESULTS_INFINITE_FOLDER}")
 
 # Salva i tempi di risposta del batch in un file .dat (uno per riga)
 def save_batch_rts(batch_rts, b):
@@ -203,3 +253,12 @@ def plot_job_visit_sequence(completed_jobs):
 # Stampa a schermo una linea di separazione
 def print_line():
     print("————————————————————————————————————————————————————————————————————————————————————————")
+
+def close_simulation():
+    print()
+    print_line()
+    time.sleep(1)
+    print("[INFO] Simulazione finita.\n")
+    print_line()
+    print()
+    time.sleep(1)

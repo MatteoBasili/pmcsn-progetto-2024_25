@@ -209,6 +209,8 @@ def infinite_horizon_simulation(k, b):
 
     batch_stats = []
 
+    print("Simulation in progress...")
+
     for bi in range(k):
         completed_batch, servers, in_flight, compl_q, clock = simulate_batch(
             b,
@@ -228,55 +230,22 @@ def infinite_horizon_simulation(k, b):
         duration = batch_end - batch_start
         last_completion_time = batch_end
 
-        # statistiche batch
-        bs = {
-            'batch_index': bi,
-            'n_completed': len(completed_batch),
-            'mean_rt': sum(job.finish - job.birth for job in completed_batch)/len(completed_batch) if completed_batch else 0.0,
-            'throughput_rps': len(completed_batch)/duration
-        }
+        # --- Compute metrics ---
+        metrics = compute_metrics_infinite(
+            servers,
+            completed_batch,
+            duration
+        )
 
-        # utilizzo e avg_n server
-        for sname, srv in servers.items():
-            bs[f'{sname}_util'] = srv.cumulative_busy_time / duration
-            bs[f'{sname}_avg_n'] = srv.area_num_in_system / duration
-            bs[f'{sname}_arrivals'] = srv.num_arrivals
-            bs[f'{sname}_departures'] = srv.num_departures
+        batch_stats.append(metrics)
 
-            # resetto statistiche batch mantenendo job in sistema e code
+        # Reset server statistics for next batch
+        for srv in servers.values():
             srv.reset_statistics()
 
-        batch_stats.append(bs)
+    print("Completed")
 
-    # --- Generazione file .dat per ogni statistica ---
-    stats_to_save = list(batch_stats[0].keys())
-    for stat in stats_to_save:
-        path = os.path.join("results/infinite/", f"{stat}.dat")
-        with open(path, "w") as f:
-            for b in batch_stats:
-                f.write(f"{b[stat]}\n")
-        print(f"✔ Salvato {path}")
-
-    '''
-    # statistiche aggregate su tutti i batch
-    aggregated = {}
-    aggregated['mean_rt'] = sum(b['mean_rt'] for b in batch_stats) / k
-    aggregated['throughput_rps'] = sum(b['throughput_rps'] for b in batch_stats) / k
-    for sname in ['A', 'B', 'P']:
-        aggregated[f'{sname}_util'] = sum(b[f'{sname}_util'] for b in batch_stats) / k
-        aggregated[f'{sname}_avg_n'] = sum(b[f'{sname}_avg_n'] for b in batch_stats) / k
-        aggregated[f'{sname}_arrivals'] = sum(b[f'{sname}_arrivals'] for b in batch_stats) / k
-        aggregated[f'{sname}_departures'] = sum(b[f'{sname}_departures'] for b in batch_stats) / k
-
-    final_state = (servers, evq, in_flight, t)
-
-    # Stampo i risultati aggregati
-    print("\n=== Aggregated Statistics Over All Batches ===")
-    for key, value in aggregated.items():
-        print(f"{key}: {value}")
-
-    return batch_stats, aggregated, final_state
-    '''
+    save_infinite_metrics(batch_stats)
 
 def simulate_finite(stop_time, arrival_rate, service_demands, arrival_stream, service_streams, ts_step):
     Job._id = 0
@@ -360,6 +329,8 @@ def finite_horizon_simulation(stop_time, num_repetitions):
         if PLOT_VISITS:
             plot_job_visit_sequence(completed_jobs)
         #########################################
+
+    print("Completed")
 
     if not PLOT_VISITS:
         save_finite_metrics(all_replicas_metrics, num_repetitions)

@@ -3,16 +3,8 @@ import time
 
 from sim_config import SIM_TIME, NUM_REPETITIONS, BATCH_K, SEARCH_BATCH_SIZE, BATCH_B, B_VALUES
 from src.simulator import finite_horizon_simulation, infinite_horizon_simulation, find_batch_b
-from src.utils import print_line
+from src.utils import print_line, close_simulation
 
-def close_simulation():
-    print()
-    print_line()
-    time.sleep(1)
-    print("[INFO] Simulazione finita.\n")
-    print_line()
-    print()
-    time.sleep(1)
 
 def run_finite_horizon():
     print("\n[INFO] Avviata simulazione a orizzonte FINITO...\n")

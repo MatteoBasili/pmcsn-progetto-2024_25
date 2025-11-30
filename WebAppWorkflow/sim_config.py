@@ -7,13 +7,13 @@
 #   "light_2FA"
 #   "heavy_1FA"
 #   "heavy_1FA_newServerB"
-SCENARIO = "heavy_1FA_newServerB"
+SCENARIO = "light_1FA"
 
 # Imposta a 'True' per visualizzare le visite ai server
 PLOT_VISITS = False
 
 # Imposta a 'True' per la ricerca del batch size ottimale
-SEARCH_BATCH_SIZE = True
+SEARCH_BATCH_SIZE = False
 
 
 # ------------------------------------------------------------
