@@ -1,5 +1,7 @@
 import heapq
 
+from tqdm import tqdm
+
 from sim_config import PLOT_VISITS, SEED, ARRIVAL_RATE, SERVICE_DEMANDS, ARRIVAL_STREAM, SERVICE_STREAMS, TS_STEP
 from src.entities import *
 from src.utils import *
@@ -209,9 +211,7 @@ def infinite_horizon_simulation(k, b):
 
     batch_stats = []
 
-    print("Simulation in progress...")
-
-    for bi in range(k):
+    for _ in tqdm(range(k), desc="Simulation in progress...", ascii="░▒▓█", ncols=100):
         completed_batch, servers, in_flight, compl_q, clock = simulate_batch(
             b,
             ARRIVAL_RATE,
@@ -317,9 +317,7 @@ def finite_horizon_simulation(stop_time, num_repetitions):
     rngs.plantSeeds(SEED)
     all_replicas_metrics = []
 
-    print("Simulation in progress...")
-
-    for _ in range(num_repetitions):
+    for _ in tqdm(range(num_repetitions), desc="Simulation in progress...", ascii="░▒▓█", ncols=100):
         metrics, completed_jobs = simulate_finite(stop_time, ARRIVAL_RATE, SERVICE_DEMANDS,
                                                   ARRIVAL_STREAM, SERVICE_STREAMS, TS_STEP)
         all_replicas_metrics.append(metrics)
