@@ -1,19 +1,36 @@
 # -------------------------------------------------------
-#               Job and Event Definitions
+#               Simulation Time
 # -------------------------------------------------------
-class Event:
-    __slots__ = ("time", "etype", "payload")
+class Clock:
+    def __init__(self, t0=0.0):
+        self.current = t0
+        self.arrival = None
+        self.next = None
 
-    def __init__(self, time, etype, payload):
+    def update_current(self, t):
+        self.current = t
+
+    def update_arrival(self, t):
+        self.arrival = t
+
+    def update_next(self, t):
+        self.next = t
+
+# -------------------------------------------------------
+#               Job and Completion Event Definitions
+# -------------------------------------------------------
+class CompletionEvent:
+    __slots__ = ("time", "payload")
+
+    def __init__(self, time, payload):
         self.time = time
-        self.etype = etype
         self.payload = payload
 
     def __lt__(self, other):
         return self.time < other.time
 
     def __repr__(self):
-        return f"Event(time={self.time}, etype={self.etype}, payload={self.payload})"
+        return f"CompletionEvent(time={self.time}, payload={self.payload})"
 
 class Job:
     _id = 0

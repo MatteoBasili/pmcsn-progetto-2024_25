@@ -53,11 +53,33 @@ def do_class_switch(job):
 
     return job.current_class
 
-# Stampa a schermo una linea di separazione
-def print_line():
-    print("————————————————————————————————————————————————————————————————————————————————————————")
+# Calcola metriche a orizzonte finito
+def compute_metrics_finite(servers, completed_jobs, t, in_flight):
+    metrics = {}
+    # RT e throughput globali
+    if completed_jobs:
+        metrics['RT'] = sum(j.finish - j.birth for j in completed_jobs) / len(completed_jobs)
+        metrics['Throughput'] = len(completed_jobs) / t
+    else:
+        metrics['RT'] = 0.0
+        metrics['Throughput'] = 0.0
 
-# Salva le statistiche ad orizzonte finito in file .dat
+    # metriche server
+    for sname, srv in servers.items():
+        metrics[f'N_{sname}'] = len(srv.jobs)
+        metrics[f'U_{sname}'] = srv.cumulative_busy_time / t
+        metrics[f'Throughput_{sname}'] = srv.num_departures / t
+
+        # RT per server
+        server_rts = [j.server_times.get(sname, 0.0) for j in completed_jobs]
+        metrics[f'RT_{sname}'] = sum(server_rts)/len(server_rts) if server_rts else 0.0
+
+    # numero di richieste in esecuzione nel sistema
+    metrics['N_system'] = len(in_flight)
+
+    return metrics
+
+# Salva le statistiche a orizzonte finito in file .dat (uno per riga)
 def save_finite_metrics(all_replicas_metrics, num_repetitions):
     os.makedirs(RESULTS_FINITE_FOLDER, exist_ok=True)
 
@@ -79,6 +101,17 @@ def save_finite_metrics(all_replicas_metrics, num_repetitions):
                 f.write(f"{val}\n")
 
     print(f"\n✔ Average metrics saved in {RESULTS_FINITE_FOLDER}")
+
+# Salva i tempi di risposta del batch in un file .dat (uno per riga)
+def save_batch_rts(batch_rts, b):
+    os.makedirs(RESULTS_INFINITE_FOLDER, exist_ok=True)
+    path = f"{RESULTS_INFINITE_FOLDER}rt_batch_inf_{b}.dat"
+
+    with open(path, "w") as f:
+        for rt in batch_rts:
+            f.write(f"{rt}\n")
+
+    return path
 
 # Visualizza la sequenza delle visite ai tre server
 def plot_job_visit_sequence(completed_jobs):
@@ -166,3 +199,7 @@ def plot_job_visit_sequence(completed_jobs):
 
     plt.tight_layout()
     plt.show()
+
+# Stampa a schermo una linea di separazione
+def print_line():
+    print("————————————————————————————————————————————————————————————————————————————————————————")
