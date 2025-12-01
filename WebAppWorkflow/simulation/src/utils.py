@@ -8,8 +8,7 @@ from collections import OrderedDict, defaultdict
 
 from lib.DES import rvgs, rngs
 
-
-RESULTS_FOLDER = "results/"
+RESULTS_FOLDER = "simulation/results/"
 RESULTS_FINITE_FOLDER = RESULTS_FOLDER + "finite/"
 RESULTS_INFINITE_FOLDER = RESULTS_FOLDER + "infinite/"
 

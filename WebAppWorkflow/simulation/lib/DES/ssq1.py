@@ -20,7 +20,7 @@
 #  */
                            
 
-FILENAME = "ssq1.dat"                  # input data file */
+FILENAME = "ssq1.dat"  # input data file */
 START = 0.0
 
 class sumOf:

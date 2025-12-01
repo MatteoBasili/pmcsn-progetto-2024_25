@@ -19,7 +19,7 @@
 #  * ------------------------------------------------------------------------- 
 #  */                     
 
-FILENAME = "sis1.dat"            # input data file                */
+FILENAME = "sis1.dat"  # input data file                */
 MINIMUM = 20                    # 's' inventory policy parameter */
 MAXIMUM = 80                    # 'S' inventory policy parameter */
 
