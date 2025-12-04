@@ -44,6 +44,7 @@ class Job:
         self.finish = None
         self.server_times = {}
         self.visit_count = {}
+        self.requested_service = {}
 
 
 # -------------------------------------------------------

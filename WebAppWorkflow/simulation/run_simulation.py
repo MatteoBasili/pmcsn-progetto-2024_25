@@ -1,20 +1,22 @@
 import sys
 import time
 
-from sim_config import SIM_TIME, NUM_REPETITIONS, BATCH_K, SEARCH_BATCH_SIZE, BATCH_B, B_VALUES
+from sim_config import SCENARIO, SIM_TIME, NUM_REPETITIONS, BATCH_K, SEARCH_BATCH_SIZE, BATCH_B, B_VALUES
 from src.simulator import finite_horizon_simulation, infinite_horizon_simulation, find_batch_b
 from src.utils import print_line, close_simulation
 
 
 def run_finite_horizon():
     print("\n[INFO] Avviata simulazione a orizzonte FINITO...\n")
+    scenario = SCENARIO
     sim_time = SIM_TIME
     num_repetitions = NUM_REPETITIONS
 
     time.sleep(1)
     print(f"\n\n==== Finite-Horizon Simulation ===="
-          f"\n* Simulation time: {sim_time}"
-          f"\n* Repetitions:     {num_repetitions}")
+          f"\n*  Scenario:        {scenario}"
+          f"\n*  Simulation time: {sim_time}"
+          f"\n*  Repetitions:     {num_repetitions}")
     print_line()
 
     finite_horizon_simulation(sim_time, num_repetitions)
@@ -27,14 +29,17 @@ def run_infinite_horizon():
 
     if SEARCH_BATCH_SIZE:
         print("\n==== Ricerca Batch Size Ottimale ====")
-        print(f"* Batch k = {BATCH_K}")
-        print("* Valori testati di b:", B_VALUES)
+        print(f"*  Scenario: {SCENARIO}")
+        print(f"*  # Batch: {BATCH_K}")
+        print("*  Valori testati di b:", B_VALUES)
         print_line()
 
         find_batch_b(BATCH_K, B_VALUES)
     else:
         print(f"\n\n==== Infinite-Horizon Simulation ===="
-              f"\n# Batch: {BATCH_K}")
+              f"\n*  Scenario: {SCENARIO}"
+              f"\n*  # Batch: {BATCH_K}"
+              f"\n*  Batch size: {BATCH_B}")
         print_line()
 
         infinite_horizon_simulation(BATCH_K, BATCH_B)

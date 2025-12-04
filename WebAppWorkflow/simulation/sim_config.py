@@ -3,10 +3,10 @@
 # ============================================================
 
 # Seleziona lo scenario:
-#   "light_1FA"
-#   "light_2FA"
-#   "heavy_1FA"
-#   "heavy_1FA_newServerB"
+# 1)  "light_1FA"
+# 2)  "light_2FA"
+# 3)  "heavy_1FA"
+# 4)  "heavy_1FA_newServerB"
 SCENARIO = "light_1FA"
 
 # Imposta a 'True' per visualizzare le visite ai server
@@ -53,7 +53,7 @@ else:
     elif SCENARIO == "light_2FA":
         BATCH_B = 8192
     elif SCENARIO == "heavy_1FA":
-        BATCH_B = 8192
+        BATCH_B = 1024
     elif SCENARIO == "heavy_1FA_newServerB":
         BATCH_B = 32768
     else:

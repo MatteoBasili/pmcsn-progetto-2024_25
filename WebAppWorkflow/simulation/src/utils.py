@@ -8,9 +8,12 @@ from collections import OrderedDict, defaultdict
 
 from lib.DES import rvgs, rngs
 
-RESULTS_FOLDER = "simulation/results/"
-RESULTS_FINITE_FOLDER = RESULTS_FOLDER + "finite/"
-RESULTS_INFINITE_FOLDER = RESULTS_FOLDER + "infinite/"
+RESULTS_FOLDER = "results/"
+FINITE_FOLDER = "finite/"
+INFINITE_FOLDER = "infinite/"
+
+RESULTS_FINITE_FOLDER = RESULTS_FOLDER + FINITE_FOLDER
+RESULTS_INFINITE_FOLDER = RESULTS_FOLDER + INFINITE_FOLDER
 
 
 # Exponential service-time sampler
@@ -110,10 +113,35 @@ def compute_metrics_infinite(servers, completed_batch, duration):
         n_system_avg = 0.0
     metrics['N_system'] = n_system_avg
 
+    # Throughput Bound + Service Demands
+    totals = {}  # server -> total service requested on that server across batch
+
+    for job in completed_batch:
+        for srv, t in job.requested_service.items():
+            totals[srv] = totals.get(srv, 0.0) + t
+
+    if n_completed > 0:
+        d_max = 0.0
+
+        for srv in servers:
+            d_i = totals.get(srv, 0.0) / n_completed
+            metrics[f'D_{srv}'] = d_i
+
+            if d_i > d_max:
+                d_max = d_i
+
+        thr_max = 1.0 / d_max if d_max > 0 else float('inf')
+    else:
+        for srv in servers:
+            metrics[f'D_{srv}'] = 0.0
+        thr_max = 0.0
+
+    metrics['Throughput_bound'] = thr_max  # req/s
+
     return metrics
 
 # Salva le statistiche a orizzonte finito in file .dat (uno per riga)
-def save_finite_metrics(all_replicas_metrics, num_repetitions):
+def save_finite_metrics(all_replicas_metrics, num_repetitions, scenario):
     os.makedirs(RESULTS_FINITE_FOLDER, exist_ok=True)
 
     num_samples = len(all_replicas_metrics[0])
@@ -128,33 +156,36 @@ def save_finite_metrics(all_replicas_metrics, num_repetitions):
             avg_values.append(mean_at_i)
 
         # Salva .dat
-        path = os.path.join(RESULTS_FINITE_FOLDER, f"{key}.dat")
+        filename = f"{key}_{scenario}.dat"
+        path = os.path.join(RESULTS_FINITE_FOLDER, filename)
         with open(path, "w") as f:
             for val in avg_values:
                 f.write(f"{val}\n")
 
-    print(f"\n✔ Metrics saved in {RESULTS_FINITE_FOLDER}")
+    print(f"\n✔ Finite-horizon metrics saved in {RESULTS_FINITE_FOLDER}")
 
 # Salva le statistiche a orizzonte infinito in file .dat (uno per riga)
-def save_infinite_metrics(batch_stats):
+def save_infinite_metrics(batch_stats, scenario):
     os.makedirs(RESULTS_INFINITE_FOLDER, exist_ok=True)
 
     # Ottieni la lista delle metriche (chiavi del primo batch)
     metric_keys = list(batch_stats[0].keys())
 
     for key in metric_keys:
-        path = os.path.join(RESULTS_INFINITE_FOLDER, f"{key}.dat")
+        filename = f"{key}_{scenario}.dat"
+        path = os.path.join(RESULTS_INFINITE_FOLDER, filename)
 
         with open(path, "w") as f:
             for bs in batch_stats:
                 f.write(f"{bs[key]}\n")
 
-    print(f"\n✔ Metrics saved in {RESULTS_INFINITE_FOLDER}")
+    print(f"\n✔ Infinite-horizon metrics saved in {RESULTS_INFINITE_FOLDER}")
 
 # Salva i tempi di risposta del batch in un file .dat (uno per riga)
-def save_batch_rts(batch_rts, b):
+def save_batch_rts(batch_rts, b, scenario):
     os.makedirs(RESULTS_INFINITE_FOLDER, exist_ok=True)
-    path = f"{RESULTS_INFINITE_FOLDER}rt_batch_inf_{b}.dat"
+    filename = f"rt_batch_inf_{b}_{scenario}.dat"
+    path = os.path.join(RESULTS_INFINITE_FOLDER, filename)
 
     with open(path, "w") as f:
         for rt in batch_rts:

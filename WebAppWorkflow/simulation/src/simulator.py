@@ -2,7 +2,8 @@ import heapq
 
 from tqdm import tqdm
 
-from sim_config import PLOT_VISITS, SEED, ARRIVAL_RATE, SERVICE_DEMANDS, ARRIVAL_STREAM, SERVICE_STREAMS, TS_STEP
+from sim_config import PLOT_VISITS, SEED, ARRIVAL_RATE, SERVICE_DEMANDS, ARRIVAL_STREAM, SERVICE_STREAMS, TS_STEP, \
+    SCENARIO
 from src.entities import *
 from src.utils import *
 
@@ -29,12 +30,14 @@ def handle_arrival(clock, compl_q, servers, service_demands, arrival_stream, ser
     if PLOT_VISITS:
         st = mean
         t_next_arr = clock.current + 3  # un arrivo ogni tre secondi
-
-        # aggiorna visita e history
-        job.visit_count['A'] = job.visit_count.get('A', 0) + 1
-        visit_number = job.visit_count['A']
-        job.history.append(('A', job.current_class, visit_number, clock.current, None))
     #########################################
+
+    job.requested_service['A'] = job.requested_service.get('A', 0.0) + st
+
+    # aggiorna visita e history
+    job.visit_count['A'] = job.visit_count.get('A', 0) + 1
+    visit_number = job.visit_count['A']
+    job.history.append(('A', job.current_class, visit_number, clock.current, None))
 
     servers['A'].process_arrival(job, st)
     schedule_departure('A', clock.current, servers, compl_q)
@@ -52,22 +55,18 @@ def handle_departure(t, compl_q, servers, service_demands,
         # stale event
         return
 
-    #########################################
-    # Per il plot della sequenza delle visite
-    if PLOT_VISITS:
-        # Aggiorna la history del job
-        for i in range(len(job.history) - 1, -1, -1):
-            if job.history[i][0] == sname and job.history[i][4] is None:
-                job.history[i] = (
-                    job.history[i][0],
-                    job.history[i][1],
-                    job.history[i][2],
-                    job.history[i][3],
-                    t
-                )
-                job.server_times[sname] = job.server_times.get(sname, 0.0) + (t - job.history[i][3])
-                break
-    #########################################
+    # Aggiorna la history del job
+    for i in range(len(job.history) - 1, -1, -1):
+        if job.history[i][0] == sname and job.history[i][4] is None:
+            job.history[i] = (
+                job.history[i][0],
+                job.history[i][1],
+                job.history[i][2],
+                job.history[i][3],
+                t
+            )
+            job.server_times[sname] = job.server_times.get(sname, 0.0) + (t - job.history[i][3])
+            break
 
     schedule_departure(sname, t, servers, compl_q)
 
@@ -82,12 +81,14 @@ def handle_departure(t, compl_q, servers, service_demands,
         # Per il plot della sequenza delle visite
         if PLOT_VISITS:
             st = mean
-
-            # aggiorna visita e history
-            job.visit_count['A'] = job.visit_count.get('A', 0) + 1
-            visit_number = job.visit_count['A']
-            job.history.append(('A', job.current_class, visit_number, t, None))
         #########################################
+
+        job.requested_service['A'] = job.requested_service.get('A', 0.0) + st
+
+        # aggiorna visita e history
+        job.visit_count['A'] = job.visit_count.get('A', 0) + 1
+        visit_number = job.visit_count['A']
+        job.history.append(('A', job.current_class, visit_number, t, None))
 
         servers['A'].process_arrival(job, st)
         schedule_departure('A', t, servers, compl_q)
@@ -100,12 +101,14 @@ def handle_departure(t, compl_q, servers, service_demands,
         # Per il plot della sequenza delle visite
         if PLOT_VISITS:
             st = mean
-
-            # aggiorna visita e history
-            job.visit_count[nextn] = job.visit_count.get(nextn, 0) + 1
-            visit_number = job.visit_count[nextn]
-            job.history.append((nextn, job.current_class, visit_number, t, None))
         #########################################
+
+        job.requested_service[nextn] = job.requested_service.get(nextn, 0.0) + st
+
+        # aggiorna visita e history
+        job.visit_count[nextn] = job.visit_count.get(nextn, 0) + 1
+        visit_number = job.visit_count[nextn]
+        job.history.append((nextn, job.current_class, visit_number, t, None))
 
         servers[nextn].process_arrival(job, st)
         schedule_departure(nextn, t, servers, compl_q)
@@ -196,7 +199,7 @@ def find_batch_b(k, b_values):
 
         print("Completed")
 
-        path = save_batch_rts(batch_rts, b)
+        path = save_batch_rts(batch_rts, b, SCENARIO)
         print(f"✔ Dati salvati in {path}")
 
 def infinite_horizon_simulation(k, b):
@@ -245,7 +248,7 @@ def infinite_horizon_simulation(k, b):
 
     print("Completed")
 
-    save_infinite_metrics(batch_stats)
+    save_infinite_metrics(batch_stats, SCENARIO)
 
 def simulate_finite(stop_time, arrival_rate, service_demands, arrival_stream, service_streams, ts_step):
     Job._id = 0
@@ -331,4 +334,4 @@ def finite_horizon_simulation(stop_time, num_repetitions):
     print("Completed")
 
     if not PLOT_VISITS:
-        save_finite_metrics(all_replicas_metrics, num_repetitions)
+        save_finite_metrics(all_replicas_metrics, num_repetitions, SCENARIO)
