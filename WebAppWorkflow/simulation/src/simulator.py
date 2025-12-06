@@ -257,6 +257,7 @@ def simulate_finite(stop_time, arrival_rate, service_demands, arrival_stream, se
 
     servers = {name: PSServer(name) for name in ['A','B','P']}
     compl_q = []
+    total_system_arrivals = 0
     completed_jobs = []
     in_flight = {}
 
@@ -289,6 +290,7 @@ def simulate_finite(stop_time, arrival_rate, service_demands, arrival_stream, se
 
         # Process event
         if clock.current == clock.arrival:
+            total_system_arrivals += 1
             handle_arrival(clock, compl_q, servers, service_demands, arrival_stream, service_streams,
                            arrival_rate, in_flight)
         else:
@@ -313,25 +315,38 @@ def simulate_finite(stop_time, arrival_rate, service_demands, arrival_stream, se
         sampled_metrics.append(metrics)
         next_sample_time += ts_step
 
-    return sampled_metrics, completed_jobs
+    return sampled_metrics, total_system_arrivals, completed_jobs, in_flight, servers
 
 # Esegue una simulazione a orizzonte finito per un certo numero di volte
 def finite_horizon_simulation(stop_time, num_repetitions):
     rngs.plantSeeds(SEED)
     all_replicas_metrics = []
+    arrivals_per_run = []
 
     for _ in tqdm(range(num_repetitions), desc="Simulation in progress...", ascii="░▒▓█", ncols=100):
-        metrics, completed_jobs = simulate_finite(stop_time, ARRIVAL_RATE, SERVICE_DEMANDS,
-                                                  ARRIVAL_STREAM, SERVICE_STREAMS, TS_STEP)
+        metrics, total_system_arrivals, completed_jobs, in_flight, servers = simulate_finite(
+            stop_time,
+            ARRIVAL_RATE,
+            SERVICE_DEMANDS,
+            ARRIVAL_STREAM,
+            SERVICE_STREAMS,
+            TS_STEP
+        )
+
+        arrivals_per_run.append(total_system_arrivals)
         all_replicas_metrics.append(metrics)
 
         #########################################
         # Per il plot della sequenza delle visite
         if PLOT_VISITS:
-            plot_job_visit_sequence(completed_jobs)
+            plot_job_visit_sequence(completed_jobs, SCENARIO)
         #########################################
+
+        if num_repetitions == 1:
+            print_arrivals_and_completions(total_system_arrivals, completed_jobs, in_flight, servers)
 
     print("Completed")
 
     if not PLOT_VISITS:
         save_finite_metrics(all_replicas_metrics, num_repetitions, SCENARIO)
+        save_finite_total_arrivals(arrivals_per_run, SCENARIO)

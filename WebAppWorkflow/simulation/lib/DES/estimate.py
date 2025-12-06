@@ -48,7 +48,7 @@ if (n > 1):
   t = idfStudent(n - 1, u)                 # critical value of t */
   w = t * stdev / sqrt(n - 1)              # interval half width */
   print("\nbased upon {0:1d} data points and with {1:d} confidence".format(n,int(100.0 * LOC + 0.5)))
-  print("the expected value is in the interval {0:10.2f} +/- {1:6.2f}".format(mean, w))
+  print("the expected value is in the interval {0:10.6f} +/- {1:10.6f}".format(mean, w))
 
 else:
   print("ERROR - insufficient data\n")

@@ -19,7 +19,7 @@ SEARCH_BATCH_SIZE = False
 # ------------------------------------------------------------
 # PARAMETRI BASE
 # ------------------------------------------------------------
-SEED = 12345
+SEED = 123456789
 ARRIVAL_STREAM = 0    # stream dedicato agli arrivi
 
 # Stream per ogni server
@@ -34,7 +34,7 @@ if PLOT_VISITS:
     SIM_TIME = 12  # secondi
     NUM_REPETITIONS = 1
 else:
-    SIM_TIME = 3600 * 4
+    SIM_TIME = 3600 * 1
     NUM_REPETITIONS = 128
 
 TS_STEP = 60  # time-slot (in secondi)
@@ -44,18 +44,19 @@ TS_STEP = 60  # time-slot (in secondi)
 BATCH_K = 128
 
 if SEARCH_BATCH_SIZE:
+    SEED = 987654321
     B_VALUES = (4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384, 32768)
     BATCH_B = None
 else:
     B_VALUES = None
     if SCENARIO == "light_1FA":
-        BATCH_B = 8192
+        BATCH_B = 4096
     elif SCENARIO == "light_2FA":
-        BATCH_B = 8192
+        BATCH_B = 4096
     elif SCENARIO == "heavy_1FA":
         BATCH_B = 1024
     elif SCENARIO == "heavy_1FA_newServerB":
-        BATCH_B = 32768
+        BATCH_B = 16384
     else:
         BATCH_B = None
 

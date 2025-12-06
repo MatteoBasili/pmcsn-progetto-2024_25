@@ -84,6 +84,7 @@ def compute_metrics_finite(servers, completed_jobs, t, in_flight):
 
     return metrics
 
+# Calcola metriche a orizzonte infinito
 def compute_metrics_infinite(servers, completed_batch, duration):
     metrics = {}
 
@@ -140,7 +141,7 @@ def compute_metrics_infinite(servers, completed_batch, duration):
 
     return metrics
 
-# Salva le statistiche a orizzonte finito in file .dat (uno per riga)
+# Salva le statistiche a orizzonte finito in file .dat (un valore per riga)
 def save_finite_metrics(all_replicas_metrics, num_repetitions, scenario):
     os.makedirs(RESULTS_FINITE_FOLDER, exist_ok=True)
 
@@ -164,7 +165,20 @@ def save_finite_metrics(all_replicas_metrics, num_repetitions, scenario):
 
     print(f"\n✔ Finite-horizon metrics saved in {RESULTS_FINITE_FOLDER}")
 
-# Salva le statistiche a orizzonte infinito in file .dat (uno per riga)
+# Salva il numero di arrivi totali al sistema in un file .dat (un valore per riga)
+def save_finite_total_arrivals(arrivals_per_run, scenario):
+    os.makedirs(RESULTS_FINITE_FOLDER, exist_ok=True)
+
+    filename = f"total_arrivals_{scenario}.dat"
+    path = os.path.join(RESULTS_FINITE_FOLDER, filename)
+
+    with open(path, "w") as f:
+        for val in arrivals_per_run:
+            f.write(f"{val}\n")
+
+    print(f"\n✔ Total arrivals per run saved in {path}")
+
+# Salva le statistiche a orizzonte infinito in file .dat (un valore per riga)
 def save_infinite_metrics(batch_stats, scenario):
     os.makedirs(RESULTS_INFINITE_FOLDER, exist_ok=True)
 
@@ -181,7 +195,7 @@ def save_infinite_metrics(batch_stats, scenario):
 
     print(f"\n✔ Infinite-horizon metrics saved in {RESULTS_INFINITE_FOLDER}")
 
-# Salva i tempi di risposta del batch in un file .dat (uno per riga)
+# Salva i tempi di risposta del batch in un file .dat (un valore per riga)
 def save_batch_rts(batch_rts, b, scenario):
     os.makedirs(RESULTS_INFINITE_FOLDER, exist_ok=True)
     filename = f"rt_batch_inf_{b}_{scenario}.dat"
@@ -194,7 +208,7 @@ def save_batch_rts(batch_rts, b, scenario):
     return path
 
 # Visualizza la sequenza delle visite ai tre server
-def plot_job_visit_sequence(completed_jobs):
+def plot_job_visit_sequence(completed_jobs, scenario):
     row_order = OrderedDict()
     row_intervals = defaultdict(list)
     max_time = 0.0
@@ -216,6 +230,14 @@ def plot_job_visit_sequence(completed_jobs):
 
     fig, ax = plt.subplots(figsize=(6, 0.5 * len(sorted_keys) + 2))
 
+    # Titolo
+    ax.set_title(
+        f"Sequenza temporale delle Visite ai tre Server durante l'esecuzione di una Richiesta (Job)\n\nScenario: {scenario}",
+        fontweight='bold',
+        fontsize=14,
+        pad=15
+    )
+
     server_colors = {'A': 'skyblue', 'B': 'salmon', 'P': 'lightgreen'}
 
     # Disegna le barre dei job
@@ -232,12 +254,6 @@ def plot_job_visit_sequence(completed_jobs):
     ax.set_yticklabels(ytick_labels, ha='center', va='center', linespacing=1.5)
     ax.tick_params(axis='y', pad=60)
     ax.set_xlabel("Time [s]")
-    ax.set_title(
-        "Sequenza temporale delle Visite ai tre Server durante l'esecuzione di una Richiesta (Job)",
-        fontweight='bold',
-        fontsize=14,
-        pad=15
-    )
 
     # Linee orizzontali per separare le righe
     for y in np.arange(-0.5, len(sorted_keys), 1):
@@ -259,7 +275,7 @@ def plot_job_visit_sequence(completed_jobs):
         ax.axvline(x=t, color='red', linestyle='-', linewidth=0.8, alpha=0.6)
         ax.text(
             t,  # posizione x
-            -1,
+            -1.25,
             f"Job {job.id}   ⟶",  # testo
             rotation=90,
             verticalalignment='top',
@@ -280,10 +296,28 @@ def plot_job_visit_sequence(completed_jobs):
     plt.tight_layout()
     plt.show()
 
+# Stampa a schermo arrivi, completamenti e job ancora in coda
+def print_arrivals_and_completions(total_system_arrivals, completed_jobs, jobs_in_flight, servers):
+    print("\n============================================================\n")
+
+    print(f"ARRIVI TOTALI AL SISTEMA: {total_system_arrivals}")
+    print(f"COMPLETAMENTI TOTALI:    {len(completed_jobs)}")
+    print(f"JOB ANCORA NEL SISTEMA:  {len(jobs_in_flight)}")
+
+    print("\n--- Servers ---")
+    for name, srv in servers.items():
+        print(f"\nServer {name}:")
+        print(f"  Arrivi:        {srv.num_arrivals}")
+        print(f"  Completamenti: {srv.num_departures}")
+        print(f"  Job residui:   {len(srv.jobs)}")
+
+    print("\n============================================================\n")
+
 # Stampa a schermo una linea di separazione
 def print_line():
     print("————————————————————————————————————————————————————————————————————————————————————————")
 
+# Stampa a schermo che è finita la simulazione
 def close_simulation():
     print()
     print_line()
