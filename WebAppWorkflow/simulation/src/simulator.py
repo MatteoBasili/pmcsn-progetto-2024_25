@@ -159,11 +159,11 @@ def simulate_batch(max_completed_jobs, arrival_rate, service_demands, arrival_st
     return completed_jobs, servers, in_flight, compl_q, clock
 
 def find_batch_b(k, b_values):
-    rngs.plantSeeds(SEED)
-
     for b in b_values:
         print(f"\n>>> Batch size b = {b}")
         print("Simulation in progress...")
+
+        rngs.plantSeeds(SEED)
 
         servers = {name: PSServer(name) for name in ['A', 'B', 'P']}
         compl_q = []

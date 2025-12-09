@@ -7,7 +7,7 @@
 # 2)  "light_2FA"
 # 3)  "heavy_1FA"
 # 4)  "heavy_1FA_newServerB"
-SCENARIO = "light_1FA"
+SCENARIO = "heavy_1FA_newServerB"
 
 # Imposta a 'True' per visualizzare le visite ai server
 PLOT_VISITS = False
@@ -19,7 +19,7 @@ SEARCH_BATCH_SIZE = False
 # ------------------------------------------------------------
 # PARAMETRI BASE
 # ------------------------------------------------------------
-SEED = 123456789
+SEED = 123456789#987654321
 ARRIVAL_STREAM = 0    # stream dedicato agli arrivi
 
 # Stream per ogni server
@@ -34,10 +34,10 @@ if PLOT_VISITS:
     SIM_TIME = 12  # secondi
     NUM_REPETITIONS = 1
 else:
-    SIM_TIME = 3600 * 1
+    SIM_TIME = 3600 * 12
     NUM_REPETITIONS = 128
 
-TS_STEP = 60  # time-slot (in secondi)
+TS_STEP = 300  # time-slot (in secondi)
 
 
 # Parametri Batch Means (per la simulazione a orizzonte infinito)
@@ -50,13 +50,13 @@ if SEARCH_BATCH_SIZE:
 else:
     B_VALUES = None
     if SCENARIO == "light_1FA":
-        BATCH_B = 4096
+        BATCH_B = 8192
     elif SCENARIO == "light_2FA":
-        BATCH_B = 4096
+        BATCH_B = 8192
     elif SCENARIO == "heavy_1FA":
         BATCH_B = 1024
     elif SCENARIO == "heavy_1FA_newServerB":
-        BATCH_B = 16384
+        BATCH_B = 32768
     else:
         BATCH_B = None
 
