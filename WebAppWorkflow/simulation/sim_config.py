@@ -7,7 +7,7 @@
 # 2)  "light_2FA"
 # 3)  "heavy_1FA"
 # 4)  "heavy_1FA_newServerB"
-SCENARIO = "heavy_1FA_newServerB"
+SCENARIO = "light_1FA"
 
 # Imposta a 'True' per visualizzare le visite ai server
 PLOT_VISITS = False
@@ -19,7 +19,7 @@ SEARCH_BATCH_SIZE = False
 # ------------------------------------------------------------
 # PARAMETRI BASE
 # ------------------------------------------------------------
-SEED = 123456789#987654321
+SEED = 987654321
 ARRIVAL_STREAM = 0    # stream dedicato agli arrivi
 
 # Stream per ogni server
@@ -34,7 +34,7 @@ if PLOT_VISITS:
     SIM_TIME = 12  # secondi
     NUM_REPETITIONS = 1
 else:
-    SIM_TIME = 3600 * 12
+    SIM_TIME = 3600 * 5
     NUM_REPETITIONS = 128
 
 TS_STEP = 300  # time-slot (in secondi)

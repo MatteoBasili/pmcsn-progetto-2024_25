@@ -180,19 +180,19 @@ def plot_jobs_in_servers_together(scenario):
 
 if __name__ == "__main__":
     # Grafico Tempo di risposta del sistema
-    plot_system_response_time(SCENARIO_HEAVY_NEW_B)
+    plot_system_response_time(SCENARIO_BASE)
 
     # Grafico Numero medio di richieste nel sistema
-    plot_system_number(SCENARIO_HEAVY_NEW_B)
+    plot_system_number(SCENARIO_BASE)
 
     # Grafico Andamento richieste nei Server A–B–P
-    plot_jobs_in_servers_together(SCENARIO_HEAVY_NEW_B)
+    plot_jobs_in_servers_together(SCENARIO_BASE)
 
     # Grafico Utilizzazioni dei server
-    plot_utilizations_together(SCENARIO_HEAVY_NEW_B)
+    plot_utilizations_together(SCENARIO_BASE)
 
     # Grafico Confronto RT tra light_1FA e light_2FA
-    #plot_rt_comparison_between_base_and_sca()
+    plot_rt_comparison_between_base_and_sca()
 
     # Grafico Confronto N_system tra light_1FA e light_2FA
-    #plot_n_system_comparison_between_base_and_sca()
+    plot_n_system_comparison_between_base_and_sca()
