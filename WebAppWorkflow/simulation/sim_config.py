@@ -15,6 +15,9 @@ PLOT_VISITS = False
 # Imposta a 'True' per la ricerca del batch size ottimale
 SEARCH_BATCH_SIZE = False
 
+# Imposta a 'True' per la ricerca del throughput bound
+SEARCH_THR_BOUND = False
+
 
 # ------------------------------------------------------------
 # PARAMETRI BASE

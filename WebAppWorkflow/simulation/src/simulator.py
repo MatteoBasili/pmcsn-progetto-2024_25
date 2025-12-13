@@ -3,7 +3,7 @@ import heapq
 from tqdm import tqdm
 
 from sim_config import PLOT_VISITS, SEED, ARRIVAL_RATE, SERVICE_DEMANDS, ARRIVAL_STREAM, SERVICE_STREAMS, TS_STEP, \
-    SCENARIO
+    SCENARIO, SEARCH_THR_BOUND
 from src.entities import *
 from src.utils import *
 
@@ -202,7 +202,7 @@ def find_batch_b(k, b_values):
         path = save_batch_rts(batch_rts, b, SCENARIO)
         print(f"✔ Dati salvati in {path}")
 
-def infinite_horizon_simulation(k, b):
+def infinite_horizon_simulation(k, b, arrival_rate):
     rngs.plantSeeds(SEED)
 
     # inizializzo sistema
@@ -217,7 +217,7 @@ def infinite_horizon_simulation(k, b):
     for _ in tqdm(range(k), desc="Simulation in progress...", ascii="░▒▓█", ncols=100):
         completed_batch, servers, in_flight, compl_q, clock = simulate_batch(
             b,
-            ARRIVAL_RATE,
+            arrival_rate,
             SERVICE_DEMANDS,
             ARRIVAL_STREAM,
             SERVICE_STREAMS,
@@ -248,7 +248,11 @@ def infinite_horizon_simulation(k, b):
 
     print("Completed")
 
-    save_infinite_metrics(batch_stats, SCENARIO)
+    if not SEARCH_THR_BOUND:
+        save_infinite_metrics(batch_stats, SCENARIO)
+
+    return batch_stats
+
 
 def simulate_finite(stop_time, arrival_rate, service_demands, arrival_stream, service_streams, ts_step):
     Job._id = 0
@@ -350,3 +354,34 @@ def finite_horizon_simulation(stop_time, num_repetitions):
     if not PLOT_VISITS:
         save_finite_metrics(all_replicas_metrics, num_repetitions, SCENARIO)
         save_finite_total_arrivals(arrivals_per_run, SCENARIO)
+
+def compute_throughput_vs_lambda(scenario):
+    # Parametri simulazione
+    lambda_start = 0.5
+    lambda_end = 1.35
+    lambda_step = 0.05
+
+    # Costruiamo la lista dei lambda
+    lambda_values = np.arange(lambda_start, lambda_end + 1e-9, lambda_step)
+
+    throughput_values = []
+
+    for lam in lambda_values:
+        print(f"Lambda = {lam:.2f}")
+
+        # Lancia simulazione a orizzonte infinito
+        metrics = infinite_horizon_simulation(k=128, b=1024, arrival_rate=lam)
+
+        # Estrai throughput batch-level
+        thr_list = [m["Throughput"] for m in metrics]
+
+        # Throughput medio della run
+        thr_mean = np.mean(thr_list)
+        throughput_values.append(thr_mean)
+
+        print(f"  → Throughput medio: {thr_mean:.6f}\n")
+
+    # Plot thr vs. lambda
+    plot_throughput_vs_lambda(lambda_values, throughput_values, scenario)
+
+    return lambda_values, throughput_values

@@ -1,8 +1,10 @@
 import sys
 import time
 
-from sim_config import SCENARIO, SIM_TIME, NUM_REPETITIONS, BATCH_K, SEARCH_BATCH_SIZE, BATCH_B, B_VALUES
-from src.simulator import finite_horizon_simulation, infinite_horizon_simulation, find_batch_b
+from sim_config import SCENARIO, SIM_TIME, NUM_REPETITIONS, BATCH_K, SEARCH_BATCH_SIZE, BATCH_B, B_VALUES, ARRIVAL_RATE, \
+    SEARCH_THR_BOUND
+from src.simulator import finite_horizon_simulation, infinite_horizon_simulation, find_batch_b, \
+    compute_throughput_vs_lambda
 from src.utils import print_line, close_simulation
 
 
@@ -35,6 +37,18 @@ def run_infinite_horizon():
         print_line()
 
         find_batch_b(BATCH_K, B_VALUES)
+    elif SEARCH_THR_BOUND:
+        if SCENARIO == "light_1FA" or SCENARIO == "heavy_1FA":
+            scenario = "1FA"
+        elif SCENARIO == "light_2FA":
+            scenario = "2FA"
+        else:
+            scenario = "1FA New B"
+        print(f"\n\n==== Ricerca del Throughput Bound ===="
+              f"\n*  Scenario: {scenario}")
+        print_line()
+
+        compute_throughput_vs_lambda(scenario)
     else:
         print(f"\n\n==== Infinite-Horizon Simulation ===="
               f"\n*  Scenario: {SCENARIO}"
@@ -42,7 +56,7 @@ def run_infinite_horizon():
               f"\n*  Batch size: {BATCH_B}")
         print_line()
 
-        infinite_horizon_simulation(BATCH_K, BATCH_B)
+        infinite_horizon_simulation(BATCH_K, BATCH_B, ARRIVAL_RATE)
 
     close_simulation()
 

@@ -296,6 +296,27 @@ def plot_job_visit_sequence(completed_jobs, scenario):
     plt.tight_layout()
     plt.show()
 
+def plot_throughput_vs_lambda(lambda_values, throughput_values, scenario):
+    thr_max = 1.250741
+
+    plt.figure(figsize=(9, 5))
+
+    # Curva throughput simulato
+    plt.plot(lambda_values, throughput_values, marker='o', label="Throughput simulato")
+
+    # Linea del throughput bound analitico
+    plt.axhline(y=thr_max, color='r', linestyle='--', linewidth=2,
+                label=f"Throughput bound = {thr_max:.2f}")
+
+    plt.xlabel("λ (arrival rate)")
+    plt.ylabel("Throughput medio")
+    plt.title(f"Throughput simulato al variare di λ\n\nScenario {scenario}")
+    plt.grid(True)
+
+    plt.legend()
+    plt.tight_layout()
+    plt.show()
+
 # Stampa a schermo arrivi, completamenti e job ancora in coda
 def print_arrivals_and_completions(total_system_arrivals, completed_jobs, jobs_in_flight, servers):
     print("\n============================================================\n")
